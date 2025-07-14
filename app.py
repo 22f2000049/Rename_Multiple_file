@@ -9,7 +9,7 @@ st.title("File Renaming Tool")
 st.header("Step 1: Select File Type")
 file_type = st.selectbox(
     "Select the file type:",
-    options=["IES", "PDF", "GOS", "PNG", "All Files"]  # PNG added
+    options=["IES", "PDF", "GOS", "PNG", "All Files"]
 )
 
 # Step 2: Provide a template download link
@@ -32,40 +32,36 @@ def create_template(file_type):
 
 template_data = create_template(file_type)
 df_template = pd.DataFrame(template_data)
-template_file_name = f"File_Renaming_Template_{file_type.replace(' ', '_').upper()}.xlsx"
-df_template.to_excel(template_file_name, index=False)
+template_file_name = f"File_Renaming_Template_{file_type.replace(' ', '_').upper()}.csv"
+csv_bytes = df_template.to_csv(index=False).encode('utf-8')
 
-with open(template_file_name, "rb") as file:
-    st.download_button(
-        label=f"Download Template for {file_type}", 
-        data=file, 
-        file_name=template_file_name, 
-        mime="application/vnd.ms-excel"
-    )
+st.download_button(
+    label=f"Download Template for {file_type}", 
+    data=csv_bytes, 
+    file_name=template_file_name, 
+    mime="text/csv"
+)
 
-# Step 3: Upload folder path and Excel file
-st.header("Step 3: Upload Folder Path and Excel File")
+# Step 3: Upload folder path and CSV file
+st.header("Step 3: Upload Folder Path and CSV File")
 
 folder_path = st.text_input("Enter the folder path where the files are located:")
-uploaded_file = st.file_uploader("Upload the Excel file with renaming details", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload the CSV file with renaming details", type=["csv"])
 
 # Step 4: Process the file renaming
 if st.button("Rename Files"):
     if not folder_path or not uploaded_file:
-        st.error("Please provide both the folder path and the Excel file.")
+        st.error("Please provide both the folder path and the CSV file.")
     else:
-        # Read the Excel file
         try:
-            renaming_data = pd.read_excel(uploaded_file)
+            renaming_data = pd.read_csv(uploaded_file)
             if "Old File Name" not in renaming_data.columns or "New File Name" not in renaming_data.columns:
                 st.error("Invalid template format. Ensure it contains 'Old File Name' and 'New File Name' columns.")
             else:
-                # Rename files
                 for index, row in renaming_data.iterrows():
                     old_name = row["Old File Name"]
                     new_name = row["New File Name"]
 
-                    # Ensure the new file name has the correct extension if specific file type is selected
                     if file_type != "All Files":
                         extension = f".{file_type.upper()}"
                         if not new_name.endswith(extension):
