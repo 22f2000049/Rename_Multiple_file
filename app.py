@@ -1,8 +1,8 @@
 import pandas as pd
 import streamlit as st
 import os
+import tempfile
 
-# App Title
 st.title("File Renaming Tool")
 
 # Step 1: Select File Type
@@ -12,72 +12,66 @@ file_type = st.selectbox(
     options=["IES", "PDF", "GOS", "PNG", "All Files"]
 )
 
-# Step 2: Provide a template download link
+# Step 2: Download CSV template
 st.header("Step 2: Download Template")
 
 def create_template(file_type):
-    if file_type == "All Files":
-        example_old_file = "Example_Old_File"
-        example_new_file = "Example_New_File"
-    else:
-        extension = file_type.upper()
-        example_old_file = f"Example_Old_File.{extension}"
-        example_new_file = f"Example_New_File.{extension}"
-
+    ext = "" if file_type == "All Files" else f".{file_type.upper()}"
     return {
-        "Old File Name": [example_old_file],
-        "New File Name": [example_new_file]
+        "Old File Name": [f"Example_Old_File{ext}"],
+        "New File Name": [f"Example_New_File{ext}"]
     }
 
-template_data = create_template(file_type)
-df_template = pd.DataFrame(template_data)
-template_file_name = f"File_Renaming_Template_{file_type.replace(' ', '_').upper()}.csv"
-df_template.to_csv(template_file_name, index=False)
-
-with open(template_file_name, "rb") as file:
+df_template = pd.DataFrame(create_template(file_type))
+csv_name = f"File_Renaming_Template_{file_type.replace(' ', '_')}.csv"
+df_template.to_csv(csv_name, index=False)
+with open(csv_name, "rb") as file:
     st.download_button(
         label=f"Download Template for {file_type}",
         data=file,
-        file_name=template_file_name,
+        file_name=csv_name,
         mime="text/csv"
     )
 
-# Step 3: Upload folder path and CSV file
-st.header("Step 3: Upload Folder Path and CSV File")
+# Step 3: Upload files and CSV
+st.header("Step 3: Upload Files and CSV File")
 
-folder_path = st.text_input("Enter the folder path where the files are located:")
-uploaded_file = st.file_uploader("Upload the CSV file with renaming details", type=["csv"])
+uploaded_files = st.file_uploader("Upload files to rename", accept_multiple_files=True)
+uploaded_csv = st.file_uploader("Upload CSV with renaming instructions", type=["csv"])
 
-# Step 4: Process the file renaming
+# Step 4: Rename files
 if st.button("Rename Files"):
-    if not folder_path or not uploaded_file:
-        st.error("Please provide both the folder path and the CSV file.")
+    if not uploaded_files or not uploaded_csv:
+        st.error("Please upload both the files and the CSV.")
     else:
         try:
-            renaming_data = pd.read_csv(uploaded_file)
-            if "Old File Name" not in renaming_data.columns or "New File Name" not in renaming_data.columns:
-                st.error("Invalid template format. Ensure it contains 'Old File Name' and 'New File Name' columns.")
+            df = pd.read_csv(uploaded_csv)
+            if "Old File Name" not in df.columns or "New File Name" not in df.columns:
+                st.error("CSV must contain 'Old File Name' and 'New File Name' columns.")
             else:
-                for index, row in renaming_data.iterrows():
-                    old_name = row["Old File Name"]
-                    new_name = row["New File Name"]
+                renamed_files = []
+                for file in uploaded_files:
+                    temp_file = tempfile.NamedTemporaryFile(delete=False)
+                    temp_file.write(file.read())
+                    temp_file_path = temp_file.name
+                    temp_file.close()
 
-                    if file_type != "All Files":
-                        extension = f".{file_type.upper()}"
-                        if not new_name.endswith(extension):
-                            new_name += extension
+                    match_row = df[df["Old File Name"] == file.name]
+                    if not match_row.empty:
+                        new_name = match_row["New File Name"].values[0]
+                        if file_type != "All Files" and not new_name.endswith(f".{file_type.upper()}"):
+                            new_name += f".{file_type.upper()}"
 
-                    old_file_path = os.path.join(folder_path, old_name)
-                    new_file_path = os.path.join(folder_path, new_name)
-
-                    try:
-                        os.rename(old_file_path, new_file_path)
-                        st.success(f"Renamed: {old_name} -> {new_name}")
-                    except FileNotFoundError:
-                        st.warning(f"File not found: {old_name}")
-                    except Exception as e:
-                        st.error(f"Error renaming {old_name}: {e}")
+                        st.download_button(
+                            label=f"Download Renamed: {new_name}",
+                            data=open(temp_file_path, "rb").read(),
+                            file_name=new_name,
+                            mime="application/octet-stream"
+                        )
+                        renamed_files.append(new_name)
+                    else:
+                        st.warning(f"No match found in CSV for: {file.name}")
+                if renamed_files:
+                    st.success("Renaming completed for uploaded files.")
         except Exception as e:
-            st.error(f"Failed to process the CSV file: {e}")
-
-st.write("File renaming completed.")
+            st.error(f"Failed to process: {e}")
