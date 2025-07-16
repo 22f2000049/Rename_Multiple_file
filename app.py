@@ -15,7 +15,6 @@ file_type = st.selectbox(
 # Step 2: Provide a template download link
 st.header("Step 2: Download Template")
 
-# Dynamically create the template based on file type selection
 def create_template(file_type):
     if file_type == "All Files":
         example_old_file = "Example_Old_File"
@@ -33,14 +32,15 @@ def create_template(file_type):
 template_data = create_template(file_type)
 df_template = pd.DataFrame(template_data)
 template_file_name = f"File_Renaming_Template_{file_type.replace(' ', '_').upper()}.csv"
-csv_bytes = df_template.to_csv(index=False).encode('utf-8')
+df_template.to_csv(template_file_name, index=False)
 
-st.download_button(
-    label=f"Download Template for {file_type}", 
-    data=csv_bytes, 
-    file_name=template_file_name, 
-    mime="text/csv"
-)
+with open(template_file_name, "rb") as file:
+    st.download_button(
+        label=f"Download Template for {file_type}",
+        data=file,
+        file_name=template_file_name,
+        mime="text/csv"
+    )
 
 # Step 3: Upload folder path and CSV file
 st.header("Step 3: Upload Folder Path and CSV File")
@@ -78,6 +78,6 @@ if st.button("Rename Files"):
                     except Exception as e:
                         st.error(f"Error renaming {old_name}: {e}")
         except Exception as e:
-            st.error(f"Failed to process the file: {e}")
+            st.error(f"Failed to process the CSV file: {e}")
 
 st.write("File renaming completed.")
